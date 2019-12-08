@@ -1,4 +1,4 @@
-FROM clojure
+FROM clojure:lein
 COPY . /code
 WORKDIR /code
-CMD ["lein", "run"]
+ENTRYPOINT ["lein"]
