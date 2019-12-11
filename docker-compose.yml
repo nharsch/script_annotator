@@ -3,6 +3,7 @@ services:
   lein:
     volumes:
       - .:/code
+      - ~/.m2:/.m2
     ports:
       - "9000:9000"
     build:
