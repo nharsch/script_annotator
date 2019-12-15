@@ -1,53 +1,50 @@
-(ns cue-list.core
- (:require [clojure.spec.alpha :as s]))
+(ns cue-list.list
+ (:require [clojure.spec.alpha :as s]
+           [clojure.test]))
 
 ;; define a cue
 
+;; TODO: location?
 ;; - document location
  ;; - page
  ;; - scene
 
 (s/def ::q string?)
-(s/valid? ::q "a1")
-
 (s/def ::action string?)
 (s/def ::description string?)
 (s/def ::location map?)
-
 (s/def ::cue
   (s/keys :req-un [::q]
           :opt-un [::action ::description ::location]))
-(s/valid? ::cue {:q "a1"})
-
-;; [x] define a cue list
-;; - list of cues where cue names are unique or empty
-;; - use clojure spec to define name structure
-
+; cue-list is list of cues with unique :q names
 (s/def ::cue-list (s/and
                     (s/coll-of ::cue :distinct true :into [])
                     #(if (empty? %)
                        true
                        (apply distinct? (mapv :q %)))))
 
-(s/valid? ::cue-list [{:q "a1"}])
-
+(assert (s/valid? ::cue-list [{:q "a1"}]))
 
 
 (defn cue-names [cue-list]
+  "returns set of :q"
   (into #{} (map :q cue-list)))
-(=
- #{"a1" "a2"}
- (cue-names [{:q "a1"} {:q "a2"}]))
 
-;; TOOD: error when trying to add?
+(assert (=
+ #{"a1" "a2"}
+ (cue-names [{:q "a1"} {:q "a2"}])))
+
+
 (defn safe-to-add? [cue cue-list]
   "check if no other cue is named"
   (not ((cue-names cue-list) (:q cue))))
-(=
+
+(assert (=
   (safe-to-add?
     {:q "A1"}
     [{:q "A1"}])
-  false)
+  false))
+
 
 ;; - insert cue
 (defn add-cue-to-list
@@ -56,29 +53,30 @@
      :post [(s/valid? ::cue-list %)]}
     (conj cue-list cue))
   ([cue cue-list position]
-    {
-     :pre [(safe-to-add? cue cue-list)]
+    {:pre [(safe-to-add? cue cue-list)]
      :post [(s/valid? ::cue-list %)]}
     (concat
       (subvec cue-list 0 position)
       [cue]
       (subvec cue-list position))))
 
-(= (add-cue-to-list
-     {:q "a3"}
-     [{:q "a1"}])
-   [{:q "a1"} {:q "a3"}])
+(assert
+  (and
+    (= (add-cue-to-list
+         {:q "a3"}
+         [{:q "a1"}])
+       [{:q "a1"} {:q "a3"}])
 
-(= (add-cue-to-list
-     {:q "a1" :desc "new"}
-     [{:q "a1" :desc "old"}])
-   [{:q "a1" :desc "old"}])
+    ;; (is (thrown? AssertionError
+    ;;   (add-cue-to-list
+    ;;      {:q "a1" :desc "new"}
+    ;;      [{:q "a1" :desc "old"}])))
 
-(= (add-cue-to-list
-     {:q "a2"}
-     [{:q "a1"} {:q "a3"}]
-     1)
-   [{:q "a1"} {:q "a2"} {:q "a3"}])
+    (= (add-cue-to-list
+         {:q "a2"}
+         [{:q "a1"} {:q "a3"}]
+         1)
+       [{:q "a1"} {:q "a2"} {:q "a3"}])))
 
 
 (defn find-cue-position-by-name [cue-name cue-list]
@@ -118,7 +116,7 @@
       target-name
       (remove-cue cue-name cue-list))))
 
-(= [{:q "a1"} {:q "a3"} {:q "a2"}]
- (move-cue "a3" "a1" [{:q "a1"} {:q "a2"} {:q "a3"}]))
+;; (= [{:q "a1"} {:q "a3"} {:q "a2"}]
+;;  (move-cue "a3" "a1" [{:q "a1"} {:q "a2"} {:q "a3"}]))
 
 ;; TODO: naming/renaming strategies

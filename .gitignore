@@ -1,3 +1,6 @@
-out/*
-.cpcache
-(println "test")
+target/*
+.lein-repl-history
+.nrepl-port
+.rebel_readline_history
+.cpcache/
+.cpcache/4012885863.cp .cpcache/4012885863.libs .cpcache/4234047753.cp .cpcache/4234047753.libs .cpcache/4234047753.main
