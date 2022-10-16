@@ -33,8 +33,9 @@
   )
 
 (defn render-cues [context]
-  (set! (. context -fillStyle) "rgba(0, 50, 0, 0.5)")
-  (.fillRect context 500, 90, 350, 100)
+  (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
+  (doseq [cue (:cues @state)]
+    (.fillRect context (first cue), (last cue), 100, 40))
   )
 
 (defn pdf-canvas [{:keys [url state]}]
