@@ -1,24 +1,86 @@
 (ns cue-list.core
-  (:require [reagent.core :as r])
-  ;; (:use [cue-list.list])
+  (:require
+   [goog.object :as gobj]
+   ["react" :as react]
+   [reagent.core :as reagent]
+   [reagent.dom :as rdom]
+   )
+
 )
 
-;; (def cue-list (r/atom []))
-;;
+(def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
+
 (defn cue-list-component [cue-list]
   [:ul
      (for [cue cue-list]
        ^{:key cue} [:li "Cue " (:q cue)])])
 
+
+
+
+
+(defn pdf-canvas [{:keys [url]}]
+  ;; ref
+  (let [canvas-ref (react/useRef nil)]
+
+    ;; initialize and attach pdfjs when the canvas is mounted
+    (react/useEffect
+      (fn []
+        (-> (.getDocument pdfjs url)
+            (.-promise)
+            (.then (fn [^js pdf]
+                     (js/console.log "pdf" pdf)
+                     (.getPage pdf 1)))
+            (.then (fn [^js page]
+                     (js/console.log "page" page)
+                     (let [viewport (.getViewport page #js {:scale 1.5})
+                           canvas (.-current canvas-ref)
+                           context (.getContext canvas "2d")
+
+                           render-context
+                           #js {:canvasContext context
+                                :viewport viewport}]
+
+                       (set! canvas -height (.-height viewport))
+                       (set! canvas -width (.-width viewport))
+
+                       (-> (.render page render-context)
+                           (.-promise)
+                           (.then (fn []
+                                    (js/console.log "Page rendered."))))
+
+                       ))))
+
+        (fn []
+          ;; not sure if there is supposed to be any cleanup for the pdfjs objects
+          ;; might need to store those somewhere and dispose of them properly here
+          (js/console.log "cleanup")))
+
+      ;; ensure this only re-runs when url changes
+      #js [url])
+
+    [:canvas {:ref canvas-ref}]))
+
 (defn app []
-  [:div {:class "container"}
-   "hello world!"
-   (cue-list-component [{:q "test"}])
-   ]
+  [:f> pdf-canvas {:url "/test.pdf"}])
+
+
+
+
+;; (defn app []
+;;   [:div {:class "container"}
+;;    "hello world!"
+;;    (cue-list-component [{:q "a" :description "test cue"}])
+;;    ]
+;; )
+
+(defn ^:dev/after-load start []
+  (rdom/render [app] (js/document.querySelector "#cue-list")))
+
+
+(defn init []
+  (js/console.log "starting")
+  ;; need to tell the lib where to load the worker from, also using same CDN
+  (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.8.335/pdf.worker.min.js")
+  (start)
 )
-
-(defn say-hi []
-  (js/console.log "hi there beautiful"))
-
-(r/render [app] (js/document.querySelector "#cue-list"))
-

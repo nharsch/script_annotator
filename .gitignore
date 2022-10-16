@@ -4,3 +4,6 @@ target/*
 .rebel_readline_history
 .cpcache/
 .cpcache/4012885863.cp .cpcache/4012885863.libs .cpcache/4234047753.cp .cpcache/4234047753.libs .cpcache/4234047753.main
+resources/public/js
+node_modules
+./shadow-cljs/

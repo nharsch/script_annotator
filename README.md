@@ -1,23 +1,18 @@
 # script_cue_annotator
 
 ## TODO
-- [x] figwheel watch
-- [ ] fireplace nrepl connection
+
+- [ ] move to shadow cljs
+- [ ] get PDF.js to render PDF
+- [ ] save a coordinate and render at doc position
+- [ ] save and render text selection
+- [ ] clean up cue list data struct and operations
+- [ ] create add cue feature
+	- if currently selected text, 
+		- use selection coordinates
+		- use selection text
 - [ ] minimal UI:
   - [ ] new cue
   - [ ] delete cue
   - [ ] rename cue
-- [ ] docker container for cljs compilation
-- [x] create cue list data struct and operations
-- [ ] get annotorius to work on page
-- [ ] hook annatorius into cue sheet
-- [ ] excel dump of cue sheet
-
-
-## TO RUN
-`clj -m cjls.main -c cue-list.core -r`
-
-## misc
-- notes on setting up fireplace with rebel: https://github.com/bhauman/figwheel-main/blob/master/docs/docs/vim.md
-- to run repl: clojure -m figwheel.main --compile cue-list.core --repl
-
+- [ ] csv dump of cue sheet
