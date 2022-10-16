@@ -20,6 +20,11 @@
                           :zoom 1.5
                           :rotate 0}))
 
+(defn render-cues [context]
+  (set! (. context -fillStyle) "rgba(0, 50, 0, 0.5)")
+  (.fillRect context 500, 90, 350, 100)
+  )
+
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
   (let [canvas-ref (react/useRef nil)]
@@ -27,40 +32,44 @@
     ;; initialize and attach pdfjs when the canvas is mounted
     (react/useEffect
       (fn []
-        (-> (.getDocument pdfjs url)
-            (.-promise)
-            (.then (fn [^js pdf]
-                     (js/console.log "pdf" pdf)
-                     (.getPage pdf (:page state))))
-            (.then (fn [^js page]
-                     (js/console.log "page" (:page state))
-                     (let [viewport (.getViewport page #js {:scale (:zoom state)
-                                                            :rotation (:rotate state)
-                                                            })
-                           canvas (.-current canvas-ref)
-                           context (.getContext canvas "2d")
+        (do
+          (-> (.getDocument pdfjs url)
+              (.-promise)
+              (.then (fn [^js pdf]
+                       (js/console.log "pdf" pdf)
+                       (.getPage pdf (:page state))))
+              (.then (fn [^js page]
+                       (js/console.log "page" (:page state))
+                       (let [viewport (.getViewport page #js {:scale (:zoom state)
+                                                              :rotation (:rotate state)
+                                                              })
+                             canvas (.-current canvas-ref)
+                             context (.getContext canvas "2d")
 
-                           render-context
-                           #js {:canvasContext context
-                                :viewport viewport}]
+                             render-context
+                             #js {:canvasContext context
+                                  :viewport viewport}]
 
-                       (set! canvas -height (.-height viewport))
-                       (set! canvas -width (.-width viewport))
+                         (set! canvas -height (.-height viewport))
+                         (set! canvas -width (.-width viewport))
 
-                       (-> (.render page render-context)
-                           (.-promise)
-                           (.then (fn []
-                                    (js/console.log "Page rendered."))))
 
-                       ))))
-
+                         (-> (.render page render-context)
+                             (.-promise)
+                             (.then (fn [] (render-cues context)))
+                             (.then (fn [] (js/console.log "PDF Page rendered."))))
+                         ))))
+)
         (fn []
           ;; not sure if there is supposed to be any cleanup for the pdfjs objects
           ;; might need to store those somewhere and dispose of them properly here
           (js/console.log "cleanup")))
-
       ;; ensure this only re-runs when url changes
       #js [url state])
+    ;; TODO: render cue overlays
+
+
+
 
     [:canvas {:ref canvas-ref}]))
 
@@ -82,7 +91,7 @@
 ;; (rotate-counterclockwise)
 
 (defn app []
-  [:div [:h1 "testing"]
+  [:div [:h1 "Script Cue Annotator"]
    [:div "page: "
     [:input {:type "button" :value "<" :on-click dec-page}]
     [:input {:type "button" :value ">" :on-click inc-page}]]
@@ -95,7 +104,6 @@
    [:div "current page: " (:page @state)]
    [:f> pdf-canvas {:url "/test.pdf" :state @state}]
    ])
-
 
 
 (defn ^:dev/after-load start []
