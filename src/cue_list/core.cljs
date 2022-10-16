@@ -16,10 +16,9 @@
        ^{:key cue} [:li "Cue " (:q cue)])])
 
 
+(def state (reagent/atom {:page 1}))
 
-
-
-(defn pdf-canvas [{:keys [url]}]
+(defn pdf-canvas [{:keys [url state]}]
   ;; ref
   (let [canvas-ref (react/useRef nil)]
 
@@ -30,9 +29,9 @@
             (.-promise)
             (.then (fn [^js pdf]
                      (js/console.log "pdf" pdf)
-                     (.getPage pdf 1)))
+                     (.getPage pdf (:page state))))
             (.then (fn [^js page]
-                     (js/console.log "page" page)
+                     (js/console.log "page" (:page state))
                      (let [viewport (.getViewport page #js {:scale 1.5})
                            canvas (.-current canvas-ref)
                            context (.getContext canvas "2d")
@@ -57,25 +56,30 @@
           (js/console.log "cleanup")))
 
       ;; ensure this only re-runs when url changes
-      #js [url])
+      #js [url state])
 
     [:canvas {:ref canvas-ref}]))
 
+(defn dec-page []
+  (swap! state #(update % :page dec)))
+
+(defn inc-page []
+  (swap! state #(update % :page inc)))
+
+(js/console.log  (:page @state))
+
 (defn app []
-  [:f> pdf-canvas {:url "/test.pdf"}])
+  [:div [:h1 "testing"]
+   [:input {:type "button" :value "<" :on-click dec-page}]
+   [:input {:type "button" :value ">" :on-click inc-page}]
+   [:div "current page: " (:page @state)]
+   [:f> pdf-canvas {:url "/test.pdf" :state @state}]
+   ])
 
 
-
-
-;; (defn app []
-;;   [:div {:class "container"}
-;;    "hello world!"
-;;    (cue-list-component [{:q "a" :description "test cue"}])
-;;    ]
-;; )
 
 (defn ^:dev/after-load start []
-  (rdom/render [app] (js/document.querySelector "#cue-list")))
+  (rdom/render [app] (js/document.querySelector "#app")))
 
 
 (defn init []
