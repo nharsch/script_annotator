@@ -100,16 +100,18 @@
 
 (defn app []
   [:div [:h1 "Script Cue Annotator"]
-   [:div "page: "
-    [:input {:type "button" :value "<" :on-click dec-page}]
-    [:input {:type "button" :value ">" :on-click inc-page}]]
-   [:div "zoom: "
-    [:input {:type "button" :value "-" :on-click dec-zoom}]
-    [:input {:type "button" :value "+" :on-click inc-zoom}]]
-   [:div "rotate: "
-    [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
-    [:input {:type "button" :value "↻" :on-click rotate-clockwise}]]
-   [:div "current page: " (:page @state)]
+   [:div {:id "nav" :style {:display "flex" :column-gap "20px"}}
+    [:div {:style {:display "flex" :column-gap "5px"}}
+     [:input {:type "button" :value (gstring/format "< %s" (dec (:page @state)))  :on-click dec-page}]
+     [:div "page: " (:page @state)]
+     [:input {:type "button" :value (gstring/format "> %s" (inc (:page @state))) :on-click inc-page}]]
+    [:div "zoom: "
+     [:input {:type "button" :value "-" :on-click dec-zoom}]
+     [:input {:type "button" :value "+" :on-click inc-zoom}]]
+    [:div "rotate: "
+     [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
+
+     [:input {:type "button" :value "↻" :on-click rotate-clockwise}]]]
    [:div {:style {:display "flex"}}
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
@@ -127,6 +129,7 @@
 (defn init []
   (js/console.log "starting")
   ;; need to tell the lib where to load the worker from, also using same CDN
-  (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js")
+  (if (and pdfjs (.. pdfjs -GlobalWorkerOptions))
+    (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"))
   (start)
 )
