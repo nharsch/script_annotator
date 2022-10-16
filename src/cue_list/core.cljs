@@ -10,14 +10,15 @@
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
 
-(defn cue-list-component [cue-list]
-  [:ul
-     (for [cue cue-list]
-       ^{:key cue} [:li "Cue " (:q cue)])])
 
+;; (defn cue-list-component [cue-list]
+;;   [:ul
+;;      (for [cue cue-list]
+;;        ^{:key cue} [:li "Cue " (:q cue)])])
 
 (def state (reagent/atom {:page 1
-                          :zoom 1.5}))
+                          :zoom 1.5
+                          :rotate 0}))
 
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
@@ -33,7 +34,9 @@
                      (.getPage pdf (:page state))))
             (.then (fn [^js page]
                      (js/console.log "page" (:page state))
-                     (let [viewport (.getViewport page #js {:scale (:zoom state)})
+                     (let [viewport (.getViewport page #js {:scale (:zoom state)
+                                                            :rotation (:rotate state)
+                                                            })
                            canvas (.-current canvas-ref)
                            context (.getContext canvas "2d")
 
@@ -63,17 +66,20 @@
 
 (defn dec-page []
   (swap! state #(update % :page dec)))
-
 (defn inc-page []
   (swap! state #(update % :page inc)))
 
 (defn dec-zoom []
-  (swap! state #(update % :zoom (fn [i] (- i 0.5)))))
-
+  (swap! state #(update % :zoom (fn [i] (* i 0.75)))))
 (defn inc-zoom []
-  (swap! state #(update % :zoom (fn [i] (+ i 0.5)))))
+  (swap! state #(update % :zoom (fn [i] (* i 1.25)))))
 
-(js/console.log  (:page @state))
+(defn rotate-clockwise []
+  (swap! state #(update % :rotate (fn [i] (mod (+ i 90) 360)))))
+(defn rotate-counterclockwise []
+  (swap! state #(update % :rotate (fn [i] (mod (- i 90) 360)))))
+;; (rotate-clockwise)
+;; (rotate-counterclockwise)
 
 (defn app []
   [:div [:h1 "testing"]
@@ -81,8 +87,11 @@
     [:input {:type "button" :value "<" :on-click dec-page}]
     [:input {:type "button" :value ">" :on-click inc-page}]]
    [:div "zoom: "
-    [:input {:type "button" :value "<" :on-click dec-zoom}]
-    [:input {:type "button" :value ">" :on-click inc-zoom}]]
+    [:input {:type "button" :value "-" :on-click dec-zoom}]
+    [:input {:type "button" :value "+" :on-click inc-zoom}]]
+   [:div "rotate: "
+    [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
+    [:input {:type "button" :value "↻" :on-click rotate-clockwise}]]
    [:div "current page: " (:page @state)]
    [:f> pdf-canvas {:url "/test.pdf" :state @state}]
    ])
@@ -96,6 +105,6 @@
 (defn init []
   (js/console.log "starting")
   ;; need to tell the lib where to load the worker from, also using same CDN
-  (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.8.335/pdf.worker.min.js")
+  (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js")
   (start)
 )
