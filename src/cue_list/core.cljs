@@ -1,6 +1,7 @@
 (ns cue-list.core
   (:require
    [goog.object :as gobj]
+   [goog.string :as gstring]
    ["react" :as react]
    [reagent.core :as reagent]
    [reagent.dom :as rdom]
@@ -18,7 +19,18 @@
 
 (def state (reagent/atom {:page 1
                           :zoom 1.5
-                          :rotate 0}))
+                          :rotate 0
+                          :cues []}))
+
+(defn on-canvas-click [event]
+  ;; translat page coordinate to canvas coordinate
+  (let [rect (.getBoundingClientRect event.target)
+        x (- (.-pageX event) (.-left rect))
+        y (- (.-pageY event) (.-top rect))]
+    (js/console.log (gstring/format "click at %s %s" x y))
+    (swap! state assoc :cues (conj (:cues @state) (list x y)))
+    )
+  )
 
 (defn render-cues [context]
   (set! (. context -fillStyle) "rgba(0, 50, 0, 0.5)")
@@ -52,11 +64,10 @@
 
                          (set! canvas -height (.-height viewport))
                          (set! canvas -width (.-width viewport))
-
-
+                         (.addEventListener canvas "click" on-canvas-click)
                          (-> (.render page render-context)
                              (.-promise)
-                             (.then (fn [] (render-cues context)))
+                             (.then (fn [] (render-cues context))) ;; Render cues overlays
                              (.then (fn [] (js/console.log "PDF Page rendered."))))
                          ))))
 )
@@ -66,12 +77,8 @@
           (js/console.log "cleanup")))
       ;; ensure this only re-runs when url changes
       #js [url state])
-    ;; TODO: render cue overlays
 
-
-
-
-    [:canvas {:ref canvas-ref}]))
+    [:canvas {:ref canvas-ref :id "viewer"} ]))
 
 (defn dec-page []
   (swap! state #(update % :page dec)))
@@ -102,12 +109,18 @@
     [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
     [:input {:type "button" :value "↻" :on-click rotate-clockwise}]]
    [:div "current page: " (:page @state)]
-   [:f> pdf-canvas {:url "/test.pdf" :state @state}]
+   [:div {:style {:display "flex"}}
+    [:f> pdf-canvas {:url "/test.pdf" :state @state}]
+    [:div "cues"
+     [:ul (for [cue (:cues @state)]
+            ^{:key cue} [:li (gstring/format "%s %s" (first cue) (last cue))])]]]
    ])
 
+(js/document.getElementById "")
 
 (defn ^:dev/after-load start []
-  (rdom/render [app] (js/document.querySelector "#app")))
+  (rdom/render [app] (js/document.querySelector "#app"))
+  )
 
 
 (defn init []
