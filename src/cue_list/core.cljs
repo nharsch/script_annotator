@@ -16,7 +16,8 @@
        ^{:key cue} [:li "Cue " (:q cue)])])
 
 
-(def state (reagent/atom {:page 1}))
+(def state (reagent/atom {:page 1
+                          :zoom 1.5}))
 
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
@@ -32,7 +33,7 @@
                      (.getPage pdf (:page state))))
             (.then (fn [^js page]
                      (js/console.log "page" (:page state))
-                     (let [viewport (.getViewport page #js {:scale 1.5})
+                     (let [viewport (.getViewport page #js {:scale (:zoom state)})
                            canvas (.-current canvas-ref)
                            context (.getContext canvas "2d")
 
@@ -66,12 +67,22 @@
 (defn inc-page []
   (swap! state #(update % :page inc)))
 
+(defn dec-zoom []
+  (swap! state #(update % :zoom (fn [i] (- i 0.5)))))
+
+(defn inc-zoom []
+  (swap! state #(update % :zoom (fn [i] (+ i 0.5)))))
+
 (js/console.log  (:page @state))
 
 (defn app []
   [:div [:h1 "testing"]
-   [:input {:type "button" :value "<" :on-click dec-page}]
-   [:input {:type "button" :value ">" :on-click inc-page}]
+   [:div "page: "
+    [:input {:type "button" :value "<" :on-click dec-page}]
+    [:input {:type "button" :value ">" :on-click inc-page}]]
+   [:div "zoom: "
+    [:input {:type "button" :value "<" :on-click dec-zoom}]
+    [:input {:type "button" :value ">" :on-click inc-zoom}]]
    [:div "current page: " (:page @state)]
    [:f> pdf-canvas {:url "/test.pdf" :state @state}]
    ])
