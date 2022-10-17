@@ -22,11 +22,12 @@
                           :rotate 0
                           :cues []}))
 
+
 (defn on-canvas-click [event]
   ;; translat page coordinate to canvas coordinate
   (let [rect (.getBoundingClientRect event.target)
         x (- (.-pageX event) (.-left rect))
-        y (- (.-pageY event) (.-top rect))]
+        y (-  (- (.-pageY event) (.-top rect)) (.-scrollY js/window))]
     (js/console.log (gstring/format "click at %s %s" x y))
     (swap! state assoc :cues (conj (:cues @state) (list x y)))
     )
