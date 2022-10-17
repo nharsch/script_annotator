@@ -18,7 +18,7 @@
 ;;        ^{:key cue} [:li "Cue " (:q cue)])])
 
 (def state (reagent/atom {:page 1
-                          :zoom 1.5
+                          :zoom 1
                           :rotate 0
                           :cues []}))
 
@@ -26,18 +26,26 @@
 (defn on-canvas-click [event]
   ;; translat page coordinate to canvas coordinate
   (let [rect (.getBoundingClientRect event.target)
-        x (- (.-pageX event) (.-left rect))
-        y (-  (- (.-pageY event) (.-top rect)) (.-scrollY js/window))]
+        x (/ (- (.-pageX event) (.-left rect)) (:zoom @state))
+        y (/ (-  (- (.-pageY event) (.-top rect)) (.-scrollY js/window)) (:zoom @state))]
     (js/console.log (gstring/format "click at %s %s" x y))
-    (swap! state assoc :cues (conj (:cues @state) (list x y)))
+    (swap! state assoc :cues (conj (:cues @state)
+                                   {:page (:page @state) :x x :y y}))
     )
   )
+
+
+
 
 (defn render-cues [context]
   (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
   (doseq [cue (:cues @state)]
-    (.fillRect context (first cue), (last cue), 100, 40))
-  )
+    (if (= (:page cue) (:page @state))
+      (let [rect (->> [(:x cue) (:y cue) 100 30]
+                      (map #(* % (:zoom @state)))
+                      vec)]
+        (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))))
+
 
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
@@ -63,7 +71,6 @@
                              render-context
                              #js {:canvasContext context
                                   :viewport viewport}]
-
                          (set! canvas -height (.-height viewport))
                          (set! canvas -width (.-width viewport))
                          (.addEventListener canvas "click" on-canvas-click)
@@ -88,39 +95,40 @@
   (swap! state #(update % :page inc)))
 
 (defn dec-zoom []
-  (swap! state #(update % :zoom (fn [i] (* i 0.75)))))
+  (swap! state #(update % :zoom (fn [i] (- i 0.25)))))
 (defn inc-zoom []
-  (swap! state #(update % :zoom (fn [i] (* i 1.25)))))
+  (swap! state #(update % :zoom (fn [i] (+ i 0.25)))))
+
+
 
 (defn rotate-clockwise []
   (swap! state #(update % :rotate (fn [i] (mod (+ i 90) 360)))))
 (defn rotate-counterclockwise []
   (swap! state #(update % :rotate (fn [i] (mod (- i 90) 360)))))
-;; (rotate-clockwise)
-;; (rotate-counterclockwise)
 
 (defn app []
   [:div [:h1 "Script Cue Annotator"]
    [:div {:id "nav" :style {:display "flex" :column-gap "20px"}}
     [:div {:style {:display "flex" :column-gap "5px"}}
      [:input {:type "button" :value (gstring/format "< %s" (dec (:page @state)))  :on-click dec-page}]
-     [:div "page: " (:page @state)]
-     [:input {:type "button" :value (gstring/format "> %s" (inc (:page @state))) :on-click inc-page}]]
-    [:div "zoom: "
+     [:input {:type "button" :value (gstring/format "> %s" (inc (:page @state))) :on-click inc-page}]
+     [:div "page: " (:page @state)]]
+    [:div {:style {:display "flex" :column-gap "5px"}}
      [:input {:type "button" :value "-" :on-click dec-zoom}]
-     [:input {:type "button" :value "+" :on-click inc-zoom}]]
-    [:div "rotate: "
+     [:input {:type "button" :value "+" :on-click inc-zoom}]
+     (gstring/format "zoom: %s" (:zoom @state))]
+    [:div {:style {:display "flex" :column-gap "5px"}}
+     "rotate: "
      [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
-
-     [:input {:type "button" :value "↻" :on-click rotate-clockwise}]]]
+     [:input {:type "button" :value "↻" :on-click rotate-clockwise}]
+     [:div "rotation: " (:rotate @state)]]]
    [:div {:style {:display "flex"}}
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
      [:ul (for [cue (:cues @state)]
-            ^{:key cue} [:li (gstring/format "%s %s" (first cue) (last cue))])]]]
+            ^{:key cue} [:li (gstring/format "page: %s pos: %s, %s" (:page cue) (:x cue) (:y cue))])]]]
    ])
 
-(js/document.getElementById "")
 
 (defn ^:dev/after-load start []
   (rdom/render [app] (js/document.querySelector "#app"))
@@ -130,7 +138,6 @@
 (defn init []
   (js/console.log "starting")
   ;; need to tell the lib where to load the worker from, also using same CDN
-  (if (and pdfjs (.. pdfjs -GlobalWorkerOptions))
-    (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"))
+  (set! (.. pdfjs -GlobalWorkerOptions -workerSrc) "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js")
   (start)
 )
