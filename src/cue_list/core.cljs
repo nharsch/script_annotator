@@ -39,12 +39,19 @@
 
 (defn render-cues [context]
   (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
+  (.rotate context (/ (* (:rotate @state)
+                          js/Math.PI) 180))
+  (cond  (= (:rotate @state) 90) (.translate context 0 (- 0 (.. context -canvas -clientWidth)))
+         (= (:rotate @state) 180) (.translate context (- 0 (.. context -canvas -clientWidth)) (- 0 (.. context -canvas -clientHeight)))
+         (= (:rotate @state) 270) (.translate context (- 0 (.. context -canvas -clientHeight)) 0))
   (doseq [cue (:cues @state)]
+
     (if (= (:page cue) (:page @state))
       (let [rect (->> [(:x cue) (:y cue) 100 30]
                       (map #(* % (:zoom @state)))
                       vec)]
-        (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))))
+        (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))
+))
 
 
 (defn pdf-canvas [{:keys [url state]}]
