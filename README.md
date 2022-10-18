@@ -1,18 +1,16 @@
-# script_cue_annotator
+# Script Cue Annotator
 
-## TODO
+A tool for adding cue events to script PDFs.
 
-- [ ] move to shadow cljs
-- [ ] get PDF.js to render PDF
-- [ ] save a coordinate and render at doc position
-- [ ] save and render text selection
-- [ ] clean up cue list data struct and operations
-- [ ] create add cue feature
-	- if currently selected text, 
-		- use selection coordinates
-		- use selection text
-- [ ] minimal UI:
-  - [ ] new cue
-  - [ ] delete cue
-  - [ ] rename cue
-- [ ] csv dump of cue sheet
+## Goals
+- add cue positions directly to PDF doc
+- autonumber cues
+  - optionally ripple renumber when inserting between existing cues
+- generate cue sheet CSV
+- cue poistions can be
+    - doc point
+    - doc rect selection
+    - doc text selection
+- collaborative sharing
+
+![preview](https://raw.githubusercontent.com/nharsch/script_annotator/master/script%20cue%20annotator%20preview.png)
