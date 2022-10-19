@@ -17,61 +17,128 @@
 ;;      (for [cue cue-list]
 ;;        ^{:key cue} [:li "Cue " (:q cue)])])
 
-(defonce state (reagent/atom {:page 1
+(defonce state (reagent/atom {:page 16
                               :zoom 1
                               :rotate 0
                               :cues []}))
 (comment
-  (swap! state update :cues (fn [] '[]))
+  (swap! state assoc :cues '[])
+  (swap! state assoc :page 16)
+  @state
   )
 
-;; (js/console.log "test")
-;;
-(defn rotation-transform-matrix [deg]
-  (let [mat (case deg
-               0 [1 0 0 1 0 0]
-               90 [0 1 1 0 3.240000000000009 0]
-               180 [-1 0 0 1 842.04 3.240000000000009]
-               270 [0 -1 -1 0 592.2 842.04])]
-    (js/DOMMatrix. mat))
+(defn apply-transform [p m]
+  (let [xt (+
+            (* (first p) (first m))
+            (* (last p) (nth m 2))
+            (nth m 4))
+        yt (+
+            (* (first p) (nth m 1))
+            (* (last p) (nth m 3))
+            (nth m 5))]
+    [xt  yt]))
+(comment
+  (apply-transform [0 0] (.-transform (.-viewport js/Window))))
+
+(defn apply-inverse-transform [p m]
+  (let [d (- (* (nth m 0) (nth m 3))
+             (* (nth m 1) (nth m 2)))
+        xt (/ (- (- (* (nth p 0) (nth m 3))
+                    (+ (* (nth p 1) (nth m 2))
+                       (* nth m 2) (nth m 5)))
+                 (* (nth m 4) (nth m 3)))
+              d)
+        yt (/ (- (+ (* (- 0 (nth p 0)) (nth m 1))
+                    (* (nth p 1) (nth m 0))
+                    (* (nth m 4) (nth m 1)))
+                 (* (nth m 5) (nth m 0)))
+              d)]
+    (js/console.log d xt)
+    [xt yt]))
+(comment
+  (apply-inverse-transform [0 0] (.-transform (.-viewport js/Window)))
   )
+
+;; static applyTransform(p, m) {
+;;   const xt = p[0] * m[0] + p[1] * m[2] + m[4];
+;;   const yt = p[0] * m[1] + p[1] * m[3] + m[5];
+;;   return [xt, yt];
+;; }
+
+;; static applyInverseTransform(p, m) {
+;;   const d = m[0] * m[3] - m[1] * m[2];
+;;   const xt = ( (p[0] * m[3] ) -
+;;              ( p[1] * m[2] ) + ( m[2] * m[5] )
+;;              - ( m[4] * m[3]) ) / d;
+;;   const yt = ( (-p[0] * m[1] ) + ( p[1] * m[0] ) + ( m[4] * m[1] ) - ( m[5] * m[0]) ) / d;
+;;   return [xt, yt];
+;; }
+
+;; dom matrix
+;; a - scales drawing hor
+;; b - skews drawing hor
+;; c - skews drawing ver
+;; d - scales drawing ver
+;; e - moves drawing hor
+;; f - moves drawing ver
+
+
+
+
+
+(defn viewport-point-to-doc-point [point viewport]
+  (apply-inverse-transform point (.-transform viewport)))
+
+(comment
+  (swap! state assoc :cues '[])
+  (.-rotation (.-viewport js/Window))
+  (.-transform (.-viewport js/Window))
+  (.inverse (js/DOMMatrix. (.-transform (.-viewport js/Window))))
+  (.-height (.-viewport js/Window))
+  (.-width (.-viewport js/Window))
+  (first (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
+  (last (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
+  )
+
+
 
 (defn on-canvas-click [event]
   ;; translat page coordinate to doc coordinate
   (let [rect (.getBoundingClientRect event.target)
-        vp-x (/ (- (.-pageX event) (.-left rect)) (:zoom @state))
-        vp-y (/ (-  (- (.-pageY event) (.-top rect)) (.-scrollY js/window)) (:zoom @state))
-        ;; TODO: find PDF.js transform
-        current-transform (rotation-transform-matrix (:rotate @state))
-        ;; TODO: get transformation that returns us to original
+        vp-x (- (.-pageX event) (.-left rect))
+        vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         ;; reset-transform
-        point (.transformPoint current-transform (js/DOMPoint. vp-x vp-y))]
-    (js/console.log "onclick transorm " current-transform)
+        point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
+    ;; (js/console.log "screen point: " (.-pageX event) " " (.-pageY event))
+    ;; (js/console.log "viewport point: " vp-x " " vp-y)
+    ;; (js/console.log "doc point: " (.-x point) " " (.-y point))
     (swap! state assoc :cues (conj (:cues @state)
-                                   {:page (:page @state) :x (.-x point) :y (.-y point)}))))
+                                   {:page (:page @state) :x (first point) :y (last point)}))))
 
 (comment
   (.getTransform (.getContext  (js/document.querySelector "#viewer") "2d"))
+  (.getTransform (.translate (.getContext  (js/document.querySelector "#viewer") "2d") 100 100))
   )
+(comment
+  (swap! state assoc :cues '[])
+  @state
+  )
+
 
 (defn render-cues [context viewport]
   ;; (js/console.log (.keys js/Object viewport))
-  (let [matrix (js/DOMMatrix. (.-transform viewport))]
-    (js/console.log "viewport: " viewport)
-    (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
-
+  (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
+    ;; rotate render context
+    (.rotate context (* (/ Math/PI 180) (:rotate @state)))
+    (cond (= (:rotate @state) 90) (.translate context 0 (- 0 (.-width viewport)))
+          (= (:rotate @state) 180) (.translate context (- 0 (.-width viewport)) (- 0 (.-height viewport)))
+          (= (:rotate @state) 270) (.translate context (- 0 (.-height viewport)) 0))
+    (.fillRect context 0 0 30 20)
     (doseq [cue (:cues @state)]
       (if (= (:page cue) (:page @state))
         ;; translate doc coordinate to canvas coord
-        (let [point (if (> (:rotate @state) 0)
-                      (.transformPoint matrix (js/DOMPoint. (:x cue) (:y cue)))
-                      (js/DOMPoint. (:x cue) (:y cue)))
-              rect (->> [(.-x point) (.-y point) 100 30]
-                        (map #(* % (:zoom @state)))
-                        vec)]
-          (js/console.log "transformed point: " (.-x point) " " (.-y point))
-          (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))
-      )))
+        (let [rect [(:x cue) (:y cue) 30 30]]
+          (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))))
 
 
 (defn pdf-canvas [{:keys [url state]}]
@@ -94,13 +161,12 @@
                                                              })
                             canvas (.-current canvas-ref)
                             context (.getContext canvas "2d")
-
                             render-context
                             #js {:canvasContext context
                                  :viewport viewport}]
-                        (js/console.log (gstring/format "viewport transform at %s %s" (:rotate state) (.-transform viewport)))
                         (set! canvas -height (.-height viewport))
                         (set! canvas -width (.-width viewport))
+                        (set! (. js/Window -viewport) viewport)
                         (.addEventListener canvas "click" on-canvas-click)
                         (-> (.render page render-context)
                             (.-promise)
@@ -111,7 +177,8 @@
        (fn []
          ;; not sure if there is supposed to be any cleanup for the pdfjs objects
          ;; might need to store those somewhere and dispose of them properly here
-         (js/console.log "cleanup")))
+         ;; (js/console.log "cleanup")
+         ))
      ;; ensure this only re-runs when url changes
      #js [url state])
 
@@ -126,7 +193,6 @@
   (swap! state #(update % :zoom (fn [i] (- i 0.25)))))
 (defn inc-zoom []
   (swap! state #(update % :zoom (fn [i] (+ i 0.25)))))
-
 
 
 (defn rotate-clockwise []
