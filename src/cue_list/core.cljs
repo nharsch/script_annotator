@@ -29,23 +29,27 @@
 
 (defn apply-transform [p m]
   (let [xt (+
-            (* (first p) (first m))
-            (* (last p) (nth m 2))
+            (* (nth p 0) (nth m 0))
+            (* (nth p 1) (nth m 2))
             (nth m 4))
         yt (+
-            (* (first p) (nth m 1))
-            (* (last p) (nth m 3))
+            (* (nth p 0) (nth m 1))
+            (* (nth p 0) (nth m 3))
             (nth m 5))]
-    [xt  yt]))
+    [xt yt]))
 (comment
-  (apply-transform [0 0] (.-transform (.-viewport js/Window))))
+  (apply-transform [0 0] (.-transform (.-viewport js/Window)))
+  )
 
 (defn apply-inverse-transform [p m]
   (let [d (- (* (nth m 0) (nth m 3))
              (* (nth m 1) (nth m 2)))
-        xt (/ (- (- (* (nth p 0) (nth m 3))
-                    (+ (* (nth p 1) (nth m 2))
-                       (* nth m 2) (nth m 5)))
+        xt (/ (- (- (* (nth p 0)
+                       (nth m 3))
+                    (+ (* (nth p 1)
+                          (nth m 2))
+                       (* (nth m 2)
+                          (nth m 5))))
                  (* (nth m 4) (nth m 3)))
               d)
         yt (/ (- (+ (* (- 0 (nth p 0)) (nth m 1))
@@ -58,6 +62,12 @@
 (comment
   (apply-inverse-transform [0 0] (.-transform (.-viewport js/Window)))
   )
+(comment
+  (swap! state assoc :cues '[])
+  (swap! state assoc :page 16)
+  @state
+  )
+
 
 ;; static applyTransform(p, m) {
 ;;   const xt = p[0] * m[0] + p[1] * m[2] + m[4];
@@ -67,10 +77,11 @@
 
 ;; static applyInverseTransform(p, m) {
 ;;   const d = m[0] * m[3] - m[1] * m[2];
-;;   const xt = ( (p[0] * m[3] ) -
-;;              ( p[1] * m[2] ) + ( m[2] * m[5] )
-;;              - ( m[4] * m[3]) ) / d;
-;;   const yt = ( (-p[0] * m[1] ) + ( p[1] * m[0] ) + ( m[4] * m[1] ) - ( m[5] * m[0]) ) / d;
+;;   const xt = ((p[0] * m[3]) -
+;;              ((p[1] * m[2]) + (m[2] * m[5])) -
+;;              (m[4] * m[3]))
+;;              / d;
+;;   ;;   const yt = ( (-p[0] * m[1] ) + ( p[1] * m[0] ) + ( m[4] * m[1] ) - ( m[5] * m[0]) ) / d;
 ;;   return [xt, yt];
 ;; }
 
@@ -83,11 +94,10 @@
 ;; f - moves drawing ver
 
 
-
-
-
-(defn viewport-point-to-doc-point [point viewport]
-  (apply-inverse-transform point (.-transform viewport)))
+(defn viewport-point-to-doc-point [point matrix]
+  ;; (apply-transform (apply-inverse-transform point matrix) matrix)
+  (apply-inverse-transform point matrix)
+  )
 
 (comment
   (swap! state assoc :cues '[])
@@ -96,8 +106,8 @@
   (.inverse (js/DOMMatrix. (.-transform (.-viewport js/Window))))
   (.-height (.-viewport js/Window))
   (.-width (.-viewport js/Window))
-  (first (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
-  (last (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
+  (first (viewport-point-to-doc-point [0 0] (.-transform (.-viewport js/Window))))
+  (last (viewport-point-to-doc-point [0 0] (.-transorm (.-viewport js/Window))))
   )
 
 
@@ -108,12 +118,12 @@
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         ;; reset-transform
-        point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
+        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-transform (.-viewport js/Window)))]
     ;; (js/console.log "screen point: " (.-pageX event) " " (.-pageY event))
     ;; (js/console.log "viewport point: " vp-x " " vp-y)
     ;; (js/console.log "doc point: " (.-x point) " " (.-y point))
     (swap! state assoc :cues (conj (:cues @state)
-                                   {:page (:page @state) :x (first point) :y (last point)}))))
+                                   {:page (:page @state) :x (first doc-point) :y (last doc-point)}))))
 
 (comment
   (.getTransform (.getContext  (js/document.querySelector "#viewer") "2d"))
