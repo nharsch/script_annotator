@@ -93,11 +93,29 @@
 ;; e - moves drawing hor
 ;; f - moves drawing ver
 
+(defn dommatrix-list [mat]
+  [(.-a mat)
+   (.-b mat)
+   (.-c mat)
+   (.-d mat)
+   (.-e mat)
+   (.-f mat)])
 
-(defn viewport-point-to-doc-point [point matrix]
+
+(defn viewport-translation [viewport]
+  (let [scale (:zoom @state)
+        scale-mat (js/DOMMatrix. [scale 0 0 scale 0 0])
+        rot-mat (.rotate scale-mat (* (/ Math/PI 180) (:rotate @state)))
+        mat (cond (= (:rotate @state) 0) rot-mat
+                  (= (:rotate @state) 90) (.translate rot-mat 0 (- 0 (.-width viewport)))
+                  (= (:rotate @state) 180) (.translate rot-mat (- 0 (.-width viewport)) (- 0 (.-height viewport)))
+                  (= (:rotate @state) 270) (.translate rot-mat (- 0 (.-height viewport)) 0))]
+    (dommatrix-list mat)))
+
+(defn viewport-point-to-doc-point [point viewport]
   ;; (apply-transform (apply-inverse-transform point matrix) matrix)
-  (apply-inverse-transform point matrix)
-  )
+  (let [trans-mat (viewport-translation viewport)]
+    (apply-inverse-transform point trans-mat)))
 
 (comment
   (swap! state assoc :cues '[])
@@ -106,8 +124,8 @@
   (.inverse (js/DOMMatrix. (.-transform (.-viewport js/Window))))
   (.-height (.-viewport js/Window))
   (.-width (.-viewport js/Window))
-  (first (viewport-point-to-doc-point [0 0] (.-transform (.-viewport js/Window))))
-  (last (viewport-point-to-doc-point [0 0] (.-transorm (.-viewport js/Window))))
+  (first (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
+  (last (viewport-point-to-doc-point [0 0] (.-viewport js/Window)))
   )
 
 
@@ -118,7 +136,7 @@
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         ;; reset-transform
-        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-transform (.-viewport js/Window)))]
+        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
     ;; (js/console.log "screen point: " (.-pageX event) " " (.-pageY event))
     ;; (js/console.log "viewport point: " vp-x " " vp-y)
     ;; (js/console.log "doc point: " (.-x point) " " (.-y point))
