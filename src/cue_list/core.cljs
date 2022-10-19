@@ -93,7 +93,7 @@
 ;; e - moves drawing hor
 ;; f - moves drawing ver
 
-(defn dommatrix-list [mat]
+(defn dommatrix-vec [mat]
   [(.-a mat)
    (.-b mat)
    (.-c mat)
@@ -101,6 +101,8 @@
    (.-e mat)
    (.-f mat)])
 
+(defn dom-point-vec [point]
+  [(.-x point) (.-y point)])
 
 (defn viewport-translation [viewport]
   (let [scale (:zoom @state)
@@ -110,12 +112,26 @@
                   (= (:rotate @state) 90) (.translate rot-mat 0 (- 0 (.-width viewport)))
                   (= (:rotate @state) 180) (.translate rot-mat (- 0 (.-width viewport)) (- 0 (.-height viewport)))
                   (= (:rotate @state) 270) (.translate rot-mat (- 0 (.-height viewport)) 0))]
-    (dommatrix-list mat)))
+    (dommatrix-vec mat)))
 
 (defn viewport-point-to-doc-point [point viewport]
-  ;; (apply-transform (apply-inverse-transform point matrix) matrix)
-  (let [trans-mat (viewport-translation viewport)]
+  (let [trans-mat (.-transform viewport)]
     (apply-inverse-transform point trans-mat)))
+
+(defn doc-point-to-view-point [doc-point viewport]
+  (dom-point-vec (.transformPoint (js/DOMMatrix. (.-transform viewport))
+                                  (js/DOMPoint. (nth doc-point 0) (nth doc-point 1)))))
+
+(comment
+  (swap! state assoc :cues '[])
+  @state
+  (dom-point-vec (.transformPoint (js/DOMMatrix. (.-transform (.-viewport js/Window)))
+                                  (js/DOMPoint. 0 0)))
+  (dom-point-vec (.transformPoint (js/DOMMatrix. (.-transform (.-viewport js/Window)))
+                                  (js/DOMPoint. 0 500)))
+  (doc-point-to-view-point [0 0] (.-viewport js/Window))
+  (doc-point-to-view-point [0 500] (.-viewport js/Window))
+  )
 
 (comment
   (swap! state assoc :cues '[])
@@ -129,7 +145,6 @@
   )
 
 
-
 (defn on-canvas-click [event]
   ;; translat page coordinate to doc coordinate
   (let [rect (.getBoundingClientRect event.target)
@@ -137,19 +152,19 @@
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         ;; reset-transform
         doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
-    ;; (js/console.log "screen point: " (.-pageX event) " " (.-pageY event))
-    ;; (js/console.log "viewport point: " vp-x " " vp-y)
-    ;; (js/console.log "doc point: " (.-x point) " " (.-y point))
     (swap! state assoc :cues (conj (:cues @state)
                                    {:page (:page @state) :x (first doc-point) :y (last doc-point)}))))
 
 (comment
+  (.getTransform (.getContext  (js/document.querySelector "#viewer") "2d"))
   (.getTransform (.getContext  (js/document.querySelector "#viewer") "2d"))
   (.getTransform (.translate (.getContext  (js/document.querySelector "#viewer") "2d") 100 100))
   )
 (comment
   (swap! state assoc :cues '[])
   @state
+  (doc-point-to-view-point [0 0] (.-viewport js/Window))
+  (doc-point-to-view-point [0 500] (.-viewport js/Window))
   )
 
 
@@ -157,15 +172,13 @@
   ;; (js/console.log (.keys js/Object viewport))
   (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
     ;; rotate render context
-    (.rotate context (* (/ Math/PI 180) (:rotate @state)))
-    (cond (= (:rotate @state) 90) (.translate context 0 (- 0 (.-width viewport)))
-          (= (:rotate @state) 180) (.translate context (- 0 (.-width viewport)) (- 0 (.-height viewport)))
-          (= (:rotate @state) 270) (.translate context (- 0 (.-height viewport)) 0))
-    (.fillRect context 0 0 30 20)
+    (let [point (doc-point-to-view-point [0 0] viewport)]
+      (.fillRect context (nth point 0) (nth point 1) 30 20))
     (doseq [cue (:cues @state)]
       (if (= (:page cue) (:page @state))
         ;; translate doc coordinate to canvas coord
-        (let [rect [(:x cue) (:y cue) 30 30]]
+        (let [point (doc-point-to-view-point [(:x cue) (:y cue)] viewport)
+              rect [(first point) (last point) 30 30]]
           (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))))
 
 
