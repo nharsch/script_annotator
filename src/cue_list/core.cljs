@@ -47,6 +47,16 @@
   (dom-point-vec (.transformPoint (js/DOMMatrix. (.-transform viewport))
                                   (js/DOMPoint. (nth doc-point 0) (nth doc-point 1)))))
 
+(defn cue-flag-points [origin]
+  [
+   origin
+   [(- (first origin) 10)  (- (second origin) 10)]
+   [(- (first origin) 50) (- (second origin) 10)]
+   [(- (first origin) 50) (+ (second origin) 10)]
+   [(- (first origin) 10)  (+ (second origin) 10)]
+   ]
+  )
+
 (comment
   (swap! state assoc :cues '[])
   (.-rotation (.-viewport js/Window))
@@ -65,18 +75,14 @@
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         ;; reset-transform
-        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
-    (swap! state assoc :cues (conj (:cues @state)
-                                   {:page (:page @state)
-                                    :x (first doc-point)
-                                    :y (last doc-point)}))))
+        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))
+        cue-flag (cue-flag-points doc-point)]
+    (swap! state assoc :cues (conj (:cues @state) {:page (:page @state) :flag cue-flag }))))
 
 
 (comment
   (swap! state assoc :cues '[])
   @state
-  (doc-point-to-view-point [0 0] (.-viewport js/Window))
-  (doc-point-to-view-point [0 500] (.-viewport js/Window))
   )
 
 
@@ -84,18 +90,44 @@
   ;; (js/console.log (.keys js/Object viewport))
   (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
     ;; rotate render context
-    (doseq [cue (:cues @state)]
-      (if (= (:page cue) (:page @state))
-        ;; translate doc coordinate to canvas coord
-        (let [point (doc-point-to-view-point [(:x cue) (:y cue)] viewport)
-              rect [(first point) (last point) (* (:zoom @state) 30) (* (:zoom @state) 30)]]
-          (.save context)  ;; save point
-          (.translate context (first point) (second point))  ;; move to point
-          (.rotate context (deg-radian (:rotate @state)))  ;; rotate around point
-          (.translate context (- 0 (first point)) (- 0 (second point)))  ;; translate back to 0 0
-          (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))  ;; fill rext
-          (.restore context)
-          ))))
+  (doseq [cue (filter #(= (:page %) (:page @state))
+                      (:cues @state))]
+      ;; translate doc coordinate to canvas coord
+      ;;
+      (let [flag-points (map #(doc-point-to-view-point % viewport) (:flag cue))]
+        (js/console.log "flag points: " (into-array flag-points))
+
+        ;; save restore point
+        (.save context)
+        ;; rotate around origin to draw
+        (.translate context
+                    (first (nth flag-points 0))
+                    (second (nth flag-points 0)))  ;; move to point
+        (.rotate context (deg-radian (:rotate @state)))  ;; rotate around point
+        (.translate context
+                    (- 0  (first (nth flag-points 0)))
+                    (- 0 (second (nth flag-points 0))))  ;; translate back to 0 0
+        (.beginPath context)
+        ;; draw cue flag
+        (.moveTo context
+                 (first  (nth flag-points 0))
+                 (second (nth flag-points 0)))
+        (.lineTo context
+                 (first  (nth flag-points 1))
+                 (second (nth flag-points 1)))
+        (.lineTo context
+                 (first  (nth flag-points 2))
+                 (second (nth flag-points 2)))
+        (.lineTo context
+                 (first  (nth flag-points 3))
+                 (second (nth flag-points 3)))
+        (.lineTo context
+                 (first  (nth flag-points 4))
+                 (second (nth flag-points 4)))
+        (.fill context)
+        ;; reset
+        (.restore context)
+        )))
 
 
 (defn pdf-canvas [{:keys [url state]}]
@@ -173,7 +205,10 @@
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
      [:ul (for [cue (:cues @state)]
-            ^{:key cue} [:li (gstring/format "page: %s pos: %s, %s" (:page cue) (:x cue) (:y cue))])]]]
+            ^{:key cue} [:li (gstring/format "page: %s pos: %s, %s"
+                                             (:page cue)
+                                             (first  (first (:flag cue)))
+                                             (second (first (:flag cue))))])]]]
    ])
 
 (defn ^:dev/before-load stop []
