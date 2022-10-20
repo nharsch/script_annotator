@@ -81,13 +81,15 @@
   @state
   )
 
+(defn sorted-cues [cues]
+  (sort-by :page cues))
+
 
 (defn render-cues [context viewport]
   ;; (js/console.log (.keys js/Object viewport))
   (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
     ;; rotate render context
-  (doseq [cue (filter #(= (:page %) (:page @state))
-                      (:cues @state))]
+  (doseq [cue (filter #(= (:page %) (:page @state)) (:cues @state))]
     (let [flag-points (cue-flag-points (doc-point-to-view-point (:point cue) viewport))]
         (.beginPath context)
         ;; draw cue
@@ -165,8 +167,13 @@
   (swap! state #(update % :rotate (fn [i] (mod (+ i 90) 360)))))
 (defn rotate-counterclockwise []
   (swap! state #(update % :rotate (fn [i] (mod (- i 90) 360)))))
+(defn goto-page [page]
+  (swap! state assoc :page page))
 
-
+(comment
+  (swap! state assoc :cues '[])
+  @state
+  )
 ;; APP
 (defn app []
   [:div [:h1 "Script Cue Annotator"]
@@ -187,11 +194,13 @@
    [:div {:style {:display "flex" :align-items "flex-start"}}
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
-     [:ul (for [cue (:cues @state)]
-            ^{:key cue} [:li (gstring/format "page: %s pos: %s"
-                                             (:page cue)
-                                             (:point cue))])]]]
-   ])
+     [:ul (for [cue (sorted-cues (:cues @state))]
+            ^{:key cue} [:li {:style {:list-style-type "none"}}
+                         [:input {:type "button"
+                                        :on-click (fn [e] (goto-page (:page cue)))
+                                        :value (gstring/format "page: %s pos: %s"
+                                                               (:page cue)
+                                                               (:point cue))}]])]]]])
 
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
