@@ -32,6 +32,9 @@
    (.-f mat)  ;; f - moves drawing ver
    ])
 
+(defn deg-radian [deg]
+  (* deg (/ Math/PI 180)))
+
 (defn dom-point-vec [point]
   [(.-x point) (.-y point)])
 
@@ -85,8 +88,14 @@
       (if (= (:page cue) (:page @state))
         ;; translate doc coordinate to canvas coord
         (let [point (doc-point-to-view-point [(:x cue) (:y cue)] viewport)
-              rect [(first point) (last point) 30 30]]
-          (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))))))
+              rect [(first point) (last point) (* (:zoom @state) 30) (* (:zoom @state) 30)]]
+          (.save context)  ;; save point
+          (.translate context (first point) (second point))  ;; move to point
+          (.rotate context (deg-radian (:rotate @state)))  ;; rotate around point
+          (.translate context (- 0 (first point)) (- 0 (second point)))  ;; translate back to 0 0
+          (.fillRect context (nth rect 0) (nth rect 1) (nth rect 2) (nth rect 3))  ;; fill rext
+          (.restore context)
+          ))))
 
 
 (defn pdf-canvas [{:keys [url state]}]
@@ -99,10 +108,8 @@
          (-> (.getDocument pdfjs url)
              (.-promise)
              (.then (fn [^js pdf]
-                      (js/console.log "pdf" pdf)
                       (.getPage pdf (:page state))))
              (.then (fn [^js page]
-                      (js/console.log "page" (:page state))
                       (let [viewport (.getViewport page #js {:scale (:zoom state)
                                                              :rotation (:rotate state)})
                             canvas (.-current canvas-ref)
@@ -148,21 +155,21 @@
 ;; APP
 (defn app []
   [:div [:h1 "Script Cue Annotator"]
-   [:div {:id "nav" :style {:display "flex" :column-gap "20px"}}
-    [:div {:style {:display "flex" :column-gap "5px"}}
+   [:div {:id "nav" :style {:display "flex" :align-items "flex-start" :column-gap "20px"}}
+    [:div {:style {:display "flex" :align-items "flex-start" :column-gap "5px"}}
      [:input {:type "button" :value (gstring/format "< %s" (dec (:page @state)))  :on-click dec-page}]
      [:input {:type "button" :value (gstring/format "> %s" (inc (:page @state))) :on-click inc-page}]
      [:div "page: " (:page @state)]]
-    [:div {:style {:display "flex" :column-gap "5px"}}
+    [:div {:style {:display "flex" :align-items "flex-start" :column-gap "5px"}}
      [:input {:type "button" :value "-" :on-click dec-zoom}]
      [:input {:type "button" :value "+" :on-click inc-zoom}]
      (gstring/format "zoom: %s" (:zoom @state))]
-    [:div {:style {:display "flex" :column-gap "5px"}}
+    [:div {:style {:display "flex" :align-items "flex-start" :column-gap "5px"}}
      "rotate: "
      [:input {:type "button" :value "↺" :on-click rotate-counterclockwise}]
      [:input {:type "button" :value "↻" :on-click rotate-clockwise}]
      [:div "rotation: " (:rotate @state)]]]
-   [:div {:style {:display "flex"}}
+   [:div {:style {:display "flex" :align-items "flex-start"}}
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
      [:ul (for [cue (:cues @state)]
