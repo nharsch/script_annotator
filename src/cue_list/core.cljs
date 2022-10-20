@@ -59,8 +59,6 @@
 
 (comment
   (swap! state assoc :cues '[])
-  (.-rotation (.-viewport js/Window))
-  (.-transform (.-viewport js/Window))
   (.inverse (js/DOMMatrix. (.-transform (.-viewport js/Window))))
   (.-height (.-viewport js/Window))
   (.-width (.-viewport js/Window))
@@ -74,10 +72,8 @@
   (let [rect (.getBoundingClientRect event.target)
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
-        ;; reset-transform
-        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))
-        cue-flag (cue-flag-points doc-point)]
-    (swap! state assoc :cues (conj (:cues @state) {:page (:page @state) :flag cue-flag }))))
+        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
+    (swap! state assoc :cues (conj (:cues @state) {:page (:page @state) :point doc-point}))))
 
 
 (comment
@@ -92,23 +88,9 @@
     ;; rotate render context
   (doseq [cue (filter #(= (:page %) (:page @state))
                       (:cues @state))]
-      ;; translate doc coordinate to canvas coord
-      ;;
-      (let [flag-points (map #(doc-point-to-view-point % viewport) (:flag cue))]
-        (js/console.log "flag points: " (into-array flag-points))
-
-        ;; save restore point
-        (.save context)
-        ;; rotate around origin to draw
-        (.translate context
-                    (first (nth flag-points 0))
-                    (second (nth flag-points 0)))  ;; move to point
-        (.rotate context (deg-radian (:rotate @state)))  ;; rotate around point
-        (.translate context
-                    (- 0  (first (nth flag-points 0)))
-                    (- 0 (second (nth flag-points 0))))  ;; translate back to 0 0
+    (let [flag-points (cue-flag-points (doc-point-to-view-point (:point cue) viewport))]
         (.beginPath context)
-        ;; draw cue flag
+        ;; draw cue
         (.moveTo context
                  (first  (nth flag-points 0))
                  (second (nth flag-points 0)))
@@ -125,11 +107,12 @@
                  (first  (nth flag-points 4))
                  (second (nth flag-points 4)))
         (.fill context)
-        ;; reset
-        (.restore context)
         )))
 
-
+(comment
+  (swap! state assoc :cues '[])
+  @state
+  )
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
   (let [canvas-ref (react/useRef nil)]
@@ -205,10 +188,9 @@
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
      [:ul (for [cue (:cues @state)]
-            ^{:key cue} [:li (gstring/format "page: %s pos: %s, %s"
+            ^{:key cue} [:li (gstring/format "page: %s pos: %s"
                                              (:page cue)
-                                             (first  (first (:flag cue)))
-                                             (second (first (:flag cue))))])]]]
+                                             (:point cue))])]]]
    ])
 
 (defn ^:dev/before-load stop []
