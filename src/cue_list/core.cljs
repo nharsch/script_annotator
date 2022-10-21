@@ -219,10 +219,9 @@
                   }}
      [:input {:type "button"
               :on-click (fn [e] (on-cue-click cue))
-              :value (gstring/format "cue: %s page: %s pos: %s"
+              :value (gstring/format "cue: %s page: %s"
                                      (:cue-number cue)
-                                     (:page cue)
-                                     (:point cue))}]
+                                     (:page cue))}]
      [:input {:type "button"
               :on-click (fn [e] (remove-cue cue))
               :value "x"}
