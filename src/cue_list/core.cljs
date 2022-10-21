@@ -11,12 +11,20 @@
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
 
-
+;; TODO: spec out state, cues
+;;
 (defonce state (reagent/atom {:page 16
                               :zoom 1
+                              :selected-cue 0
                               :rotate 0
                               :cues []}))
+
 (comment
+  (reset! state {:page 16
+          :zoom 1
+          :selected-cue 0
+          :rotate 0
+          :cues []})
   (swap! state assoc :cues '[])
   (swap! state assoc :page 16)
   @state
@@ -50,10 +58,10 @@
 (defn cue-flag-points [origin]
   [
    origin
-   [(- (first origin) 10)  (- (second origin) 10)]
+   [(- (first origin) 10) (- (second origin) 10)]
    [(- (first origin) 50) (- (second origin) 10)]
    [(- (first origin) 50) (+ (second origin) 10)]
-   [(- (first origin) 10)  (+ (second origin) 10)]
+   [(- (first origin) 10) (+ (second origin) 10)]
    ]
   )
 
@@ -72,9 +80,14 @@
   (let [rect (.getBoundingClientRect event.target)
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
-        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))]
-    (swap! state assoc :cues (conj (:cues @state) {:page (:page @state) :point doc-point}))))
-
+        doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))
+        last-cue (or (:cue-number (last (sort-by :cue-number (:cues @state)))) 0)]
+    (swap! state assoc :cues (conj (:cues @state)
+                                   {:cue-number (+ 1 last-cue)
+                                    :page (:page @state)
+                                    :point doc-point}))
+    (swap! state assoc :selected-cue (+ 1 last-cue))
+    ))
 
 (comment
   (swap! state assoc :cues '[])
@@ -82,34 +95,47 @@
   )
 
 (defn sorted-cues [cues]
-  (sort-by :page cues))
+  (->>
+   cues
+   (sort-by #(first (:point %)))
+   (sort-by #(second (:point %)))
+   reverse
+   (sort-by :page)))
 
 
 (defn render-cues [context viewport]
   ;; (js/console.log (.keys js/Object viewport))
-  (set! (. context -fillStyle) "rgba(204, 255, 0, 0.5)")
+
     ;; rotate render context
   (doseq [cue (filter #(= (:page %) (:page @state)) (:cues @state))]
     (let [flag-points (cue-flag-points (doc-point-to-view-point (:point cue) viewport))]
-        (.beginPath context)
-        ;; draw cue
-        (.moveTo context
-                 (first  (nth flag-points 0))
-                 (second (nth flag-points 0)))
-        (.lineTo context
-                 (first  (nth flag-points 1))
-                 (second (nth flag-points 1)))
-        (.lineTo context
-                 (first  (nth flag-points 2))
-                 (second (nth flag-points 2)))
-        (.lineTo context
+      (if (= (:selected-cue @state) (:cue-number cue))
+        (set! (. context -fillStyle) "rgba(204, 255, 110, 0.5)")
+        (set! (. context -fillStyle) "rgba(244, 231, 34, 0.5)"))
+      (.beginPath context)
+      ;; draw cue
+      (.moveTo context
+               (first  (nth flag-points 0))
+               (second (nth flag-points 0)))
+      (.lineTo context
+               (first  (nth flag-points 1))
+               (second (nth flag-points 1)))
+      (.lineTo context
+               (first  (nth flag-points 2))
+               (second (nth flag-points 2)))
+      (.lineTo context
+               (first  (nth flag-points 3))
+               (second (nth flag-points 3)))
+      (.lineTo context
+               (first  (nth flag-points 4))
+               (second (nth flag-points 4)))
+      (.fill context)
+      (set! (. context -fillStyle) (if (= (:selected-cue @state) (:cue-number cue)) "rgba(0, 0, 0, 1)" "rgba(0, 0, 0, 0.2)"))
+      (set! (. context -font) "25px sans-serif")
+      (.fillText context (:cue-number cue)
                  (first  (nth flag-points 3))
                  (second (nth flag-points 3)))
-        (.lineTo context
-                 (first  (nth flag-points 4))
-                 (second (nth flag-points 4)))
-        (.fill context)
-        )))
+      )))
 
 (comment
   (swap! state assoc :cues '[])
@@ -167,12 +193,17 @@
   (swap! state #(update % :rotate (fn [i] (mod (+ i 90) 360)))))
 (defn rotate-counterclockwise []
   (swap! state #(update % :rotate (fn [i] (mod (- i 90) 360)))))
-(defn goto-page [page]
-  (swap! state assoc :page page))
+(defn on-cue-click [cue]
+  ;; TODO: one swap
+  (swap! state assoc :page (:page cue))
+  (swap! state assoc :selected-cue (:cue-number cue)))
+(defn remove-cue [cue]
+  (swap! state assoc :cues (vec (filter #(not= (:cue-number cue) (:cue-number %)) (:cues @state)))))
 
 (comment
   (swap! state assoc :cues '[])
   @state
+  (:selected-cue @state)
   )
 ;; APP
 (defn app []
@@ -197,10 +228,15 @@
      [:ul (for [cue (sorted-cues (:cues @state))]
             ^{:key cue} [:li {:style {:list-style-type "none"}}
                          [:input {:type "button"
-                                        :on-click (fn [e] (goto-page (:page cue)))
-                                        :value (gstring/format "page: %s pos: %s"
+                                  :on-click (fn [e] (on-cue-click cue))
+                                  :value (gstring/format "cue: %s page: %s pos: %s"
+                                                               (:cue-number cue)
                                                                (:page cue)
-                                                               (:point cue))}]])]]]])
+                                                               (:point cue))}]
+                         [:input {:type "button"
+                                  :on-click (fn [e] (remove-cue cue))
+                                  :value "x"}
+                          ]])]]]])
 
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
