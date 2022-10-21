@@ -198,13 +198,36 @@
   (swap! state assoc :page (:page cue))
   (swap! state assoc :selected-cue (:cue-number cue)))
 (defn remove-cue [cue]
-  (swap! state assoc :cues (vec (filter #(not= (:cue-number cue) (:cue-number %)) (:cues @state)))))
+  (swap! state assoc :cues (vec (filter #(not= (:cue-number cue) (:cue-number %)) (:cues @state))))
+  (if (= (:cue-number cue) (:selected-cue cue))
+    (swap! state assoc :selected-cue nil)
+    )
+  )
 
 (comment
   (swap! state assoc :cues '[])
   @state
   (:selected-cue @state)
   )
+
+(defn cue-button-li [cue]
+  (fn []
+    [:li {:style {:list-style-type "none"
+                  :border-style (if (= (:selected-cue @state) (:cue-number cue))
+                                 "inset"
+                                 "none")
+                  }}
+     [:input {:type "button"
+              :on-click (fn [e] (on-cue-click cue))
+              :value (gstring/format "cue: %s page: %s pos: %s"
+                                     (:cue-number cue)
+                                     (:page cue)
+                                     (:point cue))}]
+     [:input {:type "button"
+              :on-click (fn [e] (remove-cue cue))
+              :value "x"}
+      ]]))
+
 ;; APP
 (defn app []
   [:div [:h1 "Script Cue Annotator"]
@@ -226,17 +249,7 @@
     [:f> pdf-canvas {:url "/test.pdf" :state @state}]
     [:div "cues"
      [:ul (for [cue (sorted-cues (:cues @state))]
-            ^{:key cue} [:li {:style {:list-style-type "none"}}
-                         [:input {:type "button"
-                                  :on-click (fn [e] (on-cue-click cue))
-                                  :value (gstring/format "cue: %s page: %s pos: %s"
-                                                               (:cue-number cue)
-                                                               (:page cue)
-                                                               (:point cue))}]
-                         [:input {:type "button"
-                                  :on-click (fn [e] (remove-cue cue))
-                                  :value "x"}
-                          ]])]]]])
+           ^{:key (:cue-number cue)} [cue-button-li cue])]]]])
 
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
