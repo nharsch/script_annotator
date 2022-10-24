@@ -11,6 +11,8 @@
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
 
+
+
 ;; TODO: spec out state, cues
 ;;
 (defonce state (reagent/atom {:page 16
@@ -168,7 +170,8 @@
                             (.-promise)
                             (.then (fn [] (render-cues context viewport))) ;; Render cues overlays
                             (.then (fn [] (js/console.log "PDF Page rendered."))))
-                        ))))
+                        )))
+)
          )
        (fn []
          ;; not sure if there is supposed to be any cleanup for the pdfjs objects
