@@ -147,6 +147,11 @@
   (swap! state assoc :cues '[])
   @state
   )
+
+(defn update-doc-dims [width height]
+  (swap! state assoc :doc-dims [width height])
+  )
+
 (defn pdf-canvas [{:keys [url state]}]
   ;; ref
   (let [canvas-ref (react/useRef nil)]
@@ -166,8 +171,9 @@
                             #js {:canvasContext context
                                  :viewport viewport}]
                         (set! canvas -height (.-height viewport))
+                        (update-doc-dims (.-width viewport) (.-height viewport))
                         (set! canvas -width (.-width viewport))
-                        (set! (. js/Window -viewport) viewport)
+                        (set! (. js/Window -viewport) viewport) ;; TODO: set on state?
                         (-> (.render page render-context)
                             (.-promise)
                             (.then (fn [] (js/console.log "PDF Page rendered."))))
@@ -179,8 +185,10 @@
          ))
      ;; ensure this only re-runs when url or nav changes
      #js [url (:page state) (:zoom state) (:rotate state)])
-    [:canvas {:ref canvas-ref :id "document-canvas"
-              :style {:z-index 0}}])
+    [:canvas {:ref canvas-ref
+              :id "document-canvas"
+              :style {:z-index 0
+                      :position "absolute"}}])
   )
 
 (defn cue-overlay [{:keys [state]}]
@@ -205,8 +213,8 @@
      #js [state])
     [:canvas {:ref canvas-ref
               :id "overlay-canvas"
-              :height (.-height viewport)
-              :width (.-width viewport)
+              :width (first (:doc-dims state))
+              :height (second (:doc-dims state))
               :style {:position "absolute" :z-index 1}}])
   )
 
@@ -326,7 +334,10 @@
      [:input {:type "button" :value "↻" :on-click rotate-clockwise}]
      [:div "rotation: " (:rotate @state)]]]
    [:div {:style {:display "flex" :align-items "flex-start"}}
-    [:div {:id "canvas-container" :style {:position "relative" :width "fit-content"}}
+    [:div {:id "canvas-container" :style {:position "relative"
+                                          :flex-shrink 0
+                                          :width (first (:doc-dims @state))
+                                          :height (second (:doc-dims @state))}}
      [:f> cue-overlay {:state @state}]
      [:f> pdf-canvas {:url "/test.pdf" :state @state}] ;; TODO: only view the ux/nav state of
      ]
