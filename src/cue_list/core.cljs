@@ -11,6 +11,14 @@
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
 
+;; TODO: create spec/schema for cue map
+;; CUE
+;; - :position  - not editable
+;; - :cue-number - editable, auto increment
+;; - :description - editable
+;; - :action - editable
+;;
+;; TODO: should cues be { "cue-number" { info map } }?
 
 
 ;; TODO: spec out state, cues
@@ -105,7 +113,7 @@
    (sort-by :page)))
 
 
-(defn render-cues [context viewport]
+(defn render-cue-flags [context viewport]
   ;; (js/console.log (.keys js/Object viewport))
 
     ;; rotate render context
@@ -168,7 +176,7 @@
                         (.addEventListener canvas "click" on-canvas-click)
                         (-> (.render page render-context)
                             (.-promise)
-                            (.then (fn [] (render-cues context viewport))) ;; Render cues overlays
+                            (.then (fn [] (render-cue-flags context viewport))) ;; Render cues overlays
                             (.then (fn [] (js/console.log "PDF Page rendered."))))
                         )))
 )
@@ -213,18 +221,47 @@
   (:selected-cue @state)
   )
 
+(defn update-cue-field [cue-number kw val]
+  (swap! state assoc :cues
+         (vec (map #(if (= cue-number (:cue-number %))
+                      (assoc % kw val)
+                      %)
+                   (:cues @state)))))
+;; (update-cue-field 1 :description "test")
+
+(vec (map #(if (= 1 (:cue-number %)) (assoc % :description "first cue") %)
+          (:cues @state)))
+
 (defn cue-button-li [cue]
-  (fn []
+  (if (= (:cue-number cue) (:selected-cue @state))
     [:li {:style {:list-style-type "none"
-                  :border-style (if (= (:selected-cue @state) (:cue-number cue))
-                                 "inset"
-                                 "none")
+                  :border-style "inset"}}
+     [:form
+      ;; TODO on submit form, update state
+      [:label {:for "cue-number"} "Cue Number"]
+      [:input {:type "text"
+               :id "cue-number"
+               :name "cue-number"}]
+      [:label {:for "action"} "Action"]
+      [:input {:type "text" :id "action" :name "action"}]
+      [:label {:for "description"} "Description"]
+      [:input {:type "text" :id "action" :name "action"}]
+      ]
+     [:input {:type "button"
+              :on-click (fn [e] (remove-cue cue))
+              :value "x"}
+      ]]
+    ;; display state
+    [:li {:style {:list-style-type "none"
+                  :border-style "none"
                   }}
      [:input {:type "button"
               :on-click (fn [e] (on-cue-click cue))
-              :value (gstring/format "cue: %s page: %s"
+              :value (gstring/format "cue: %s page: %s action: %s description: %s"
                                      (:cue-number cue)
-                                     (:page cue))}]
+                                     (:page cue)
+                                     (:action cue)
+                                     (:description cue))}]
      [:input {:type "button"
               :on-click (fn [e] (remove-cue cue))
               :value "x"}
