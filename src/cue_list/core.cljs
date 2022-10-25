@@ -11,6 +11,7 @@
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
 
+
 ;; TODO: create spec/schema for cue map
 ;; CUE
 ;; - :position  - not editable
@@ -25,14 +26,14 @@
 ;;
 (defonce state (reagent/atom {:page 16
                               :zoom 1
-                              :selected-cue 0
+                              :selected-cue-idx nil
                               :rotate 0
                               :cues []}))
 
 (comment
   (reset! state {:page 16
           :zoom 1
-          :selected-cue 0
+          :selected-cue-idx nil
           :rotate 0
           :cues []})
   (swap! state assoc :cues '[])
@@ -40,18 +41,6 @@
   @state
   )
 
-
-(defn dommatrix-vec [mat]
-  [(.-a mat)  ;; a - scales drawing hor
-   (.-b mat)  ;; b - skews drawing hor
-   (.-c mat)  ;; c - skews drawing ver
-   (.-d mat)  ;; d - scales drawing ver
-   (.-e mat)  ;; e - moves drawing hor
-   (.-f mat)  ;; f - moves drawing ver
-   ])
-
-(defn deg-radian [deg]
-  (* deg (/ Math/PI 180)))
 
 (defn dom-point-vec [point]
   [(.-x point) (.-y point)])
@@ -91,17 +80,20 @@
         vp-x (- (.-pageX event) (.-left rect))
         vp-y (- (- (.-pageY event) (.-top rect)) (.-scrollY js/window))
         doc-point (viewport-point-to-doc-point [vp-x vp-y] (.-viewport js/Window))
-        last-cue (or (:cue-number (last (sort-by :cue-number (:cues @state)))) 0)]
-    (swap! state assoc :cues (conj (:cues @state)
-                                   {:cue-number (+ 1 last-cue)
-                                    :page (:page @state)
-                                    :point doc-point}))
-    (swap! state assoc :selected-cue (+ 1 last-cue))
+        ;; TODO: increment cue number by finding cue number of closest position
+        last-cue (or (:cue-number (last (sort-by :cue-number (:cues @state)))) 0)
+        new-cue {:cue-number (+ 1 last-cue)
+                 :page (:page @state)
+                 :point doc-point
+                 :description ""
+                 :action ""}]
+    (swap! state assoc :cues (conj (:cues @state) new-cue))
+    (swap! state assoc :selected-cue-idx (.indexOf (:cues @state) new-cue))
     ))
 
 (comment
   (swap! state assoc :cues '[])
-  @state
+  (.indexOf (:cues @state) (second (:cues @state)))
   )
 
 (defn sorted-cues [cues]
@@ -118,8 +110,10 @@
 
     ;; rotate render context
   (doseq [cue (filter #(= (:page %) (:page @state)) (:cues @state))]
-    (let [flag-points (cue-flag-points (doc-point-to-view-point (:point cue) viewport))]
-      (if (= (:selected-cue @state) (:cue-number cue))
+    (let [flag-points (cue-flag-points (doc-point-to-view-point (:point cue) viewport))
+          selected (= (:selected-cue-idx @state) (.indexOf (:cues @state) cue))
+          ]
+      (if selected
         (set! (. context -fillStyle) "rgba(204, 255, 110, 0.5)")
         (set! (. context -fillStyle) "rgba(244, 231, 34, 0.5)"))
       (.beginPath context)
@@ -140,7 +134,9 @@
                (first  (nth flag-points 4))
                (second (nth flag-points 4)))
       (.fill context)
-      (set! (. context -fillStyle) (if (= (:selected-cue @state) (:cue-number cue)) "rgba(0, 0, 0, 1)" "rgba(0, 0, 0, 0.2)"))
+      (set! (. context -fillStyle) (if selected
+                                     "rgba(0, 0, 0, 1)"
+                                     "rgba(0, 0, 0, 0.2)"))
       (set! (. context -font) "25px sans-serif")
       (.fillText context (:cue-number cue)
                  (first  (nth flag-points 3))
@@ -160,8 +156,7 @@
        (do
          (-> (.getDocument pdfjs url)
              (.-promise)
-             (.then (fn [^js pdf]
-                      (.getPage pdf (:page state))))
+             (.then (fn [^js pdf] (.getPage pdf (:page state))))
              (.then (fn [^js page]
                       (let [viewport (.getViewport page #js {:scale (:zoom state)
                                                              :rotation (:rotate state)})
@@ -173,23 +168,53 @@
                         (set! canvas -height (.-height viewport))
                         (set! canvas -width (.-width viewport))
                         (set! (. js/Window -viewport) viewport)
-                        (.addEventListener canvas "click" on-canvas-click)
                         (-> (.render page render-context)
                             (.-promise)
-                            (.then (fn [] (render-cue-flags context viewport))) ;; Render cues overlays
                             (.then (fn [] (js/console.log "PDF Page rendered."))))
-                        )))
-)
-         )
+                        )))))
        (fn []
          ;; not sure if there is supposed to be any cleanup for the pdfjs objects
          ;; might need to store those somewhere and dispose of them properly here
          ;; (js/console.log "cleanup")
          ))
-     ;; ensure this only re-runs when url changes
-     #js [url state])
+     ;; ensure this only re-runs when url or nav changes
+     #js [url (:page state) (:zoom state) (:rotate state)])
+    [:canvas {:ref canvas-ref :id "document-canvas"
+              :style {:z-index 0}}])
+  )
 
-    [:canvas {:ref canvas-ref :id "viewer"} ]))
+(defn cue-overlay [{:keys [state]}]
+  (let [canvas-ref (react/useRef nil)
+        viewport (.-viewport js/Window)
+        doc-canvas (.getElementById js/document "document-canvas")
+        ]
+    (react/useEffect
+     (fn []
+       (do
+         (let [
+               canvas (.-current canvas-ref)
+               context (.getContext canvas "2d")
+               ]
+           (do
+             (.reset context)
+             (.addEventListener canvas "click" on-canvas-click)
+             ;; (.reset canvas)
+             (render-cue-flags context viewport))
+           ))
+       (fn [] )) ;; (js/console.log "cleanup"))
+     #js [state])
+    [:canvas {:ref canvas-ref
+              :id "overlay-canvas"
+              :height (.-height viewport)
+              :width (.-width viewport)
+              :style {:position "absolute" :z-index 1}}])
+  )
+
+(comment
+  (js/console.log (.-viewport js/Window))
+  (.-x (.getBoundingClientRect (.getElementById js/document "document-canvas")))
+  (.-y (.getBoundingClientRect (.getElementById js/document "document-canvas")))
+  )
 
 ;; UI ACTIONS
 (defn dec-page []
@@ -207,49 +232,65 @@
 (defn on-cue-click [cue]
   ;; TODO: one swap
   (swap! state assoc :page (:page cue))
-  (swap! state assoc :selected-cue (:cue-number cue)))
+  (swap! state assoc :selected-cue-idx (.indexOf (:cues @state) cue)))
 (defn remove-cue [cue]
-  (swap! state assoc :cues (vec (filter #(not= (:cue-number cue) (:cue-number %)) (:cues @state))))
-  (if (= (:cue-number cue) (:selected-cue cue))
-    (swap! state assoc :selected-cue nil)
+  (if (= (.indexOf (:cues @state) cue) (:selected-cue-idx @state))
+    (swap! state assoc :selected-cue-idx nil)
     )
+  (swap! state assoc :cues (vec (filter #(not= (:cue-number cue) (:cue-number %)) (:cues @state))))
   )
 
 (comment
   (swap! state assoc :cues '[])
   @state
-  (:selected-cue @state)
+  (:selected-cue-idx @state)
   )
 
-(defn update-cue-field [cue-number kw val]
-  (swap! state assoc :cues
-         (vec (map #(if (= cue-number (:cue-number %))
-                      (assoc % kw val)
-                      %)
-                   (:cues @state)))))
-;; (update-cue-field 1 :description "test")
+(defn update-cue-field [cue kw val]
+  (let [idx (.indexOf (:cues @state) cue)]
+    (swap! state assoc :cues
+           (assoc (:cues @state) idx (assoc (nth (:cues @state) idx) kw val)))))
+(comment
+  @state
+  (update-cue-field (first (:cues @state)) :description "test")
+  (first (:cues @state))
+  (:selected-cue-idx @state)
+  )
 
-(vec (map #(if (= 1 (:cue-number %)) (assoc % :description "first cue") %)
-          (:cues @state)))
+
 
 (defn cue-button-li [cue]
-  (if (= (:cue-number cue) (:selected-cue @state))
+  (if (= (.indexOf (:cues @state) cue) (:selected-cue-idx @state))
     [:li {:style {:list-style-type "none"
                   :border-style "inset"}}
      [:form
       ;; TODO on submit form, update state
+      {:on-submit #((.preventDefault %)
+                    (swap! state assoc :selected-cue-idx nil))}
+      ;;
       [:label {:for "cue-number"} "Cue Number"]
       [:input {:type "text"
                :id "cue-number"
-               :name "cue-number"}]
-      [:label {:for "action"} "Action"]
-      [:input {:type "text" :id "action" :name "action"}]
+               :name "cue-number"
+               :value (:cue-number cue)
+               :on-change #(update-cue-field cue :cue-number (-> % .-target .-value))}] [:label {:for "action"} "Action"]
+      [:input {:type "text"
+               :id "action"
+               :name "action"
+               :value (:action cue)
+               :on-change #(update-cue-field cue :action (-> % .-target .-value))
+               }]
       [:label {:for "description"} "Description"]
-      [:input {:type "text" :id "action" :name "action"}]
-      ]
+      [:input {:type "text"
+               :id "description"
+               :name "description"
+               :value (:description cue)
+               :on-change #(update-cue-field cue :description (-> % .-target .-value))
+               }]
+      [:input {:type "submit" :hidden true}]]
      [:input {:type "button"
               :on-click (fn [e] (remove-cue cue))
-              :value "x"}
+              :value "Delete Cue"}
       ]]
     ;; display state
     [:li {:style {:list-style-type "none"
@@ -285,10 +326,13 @@
      [:input {:type "button" :value "↻" :on-click rotate-clockwise}]
      [:div "rotation: " (:rotate @state)]]]
    [:div {:style {:display "flex" :align-items "flex-start"}}
-    [:f> pdf-canvas {:url "/test.pdf" :state @state}]
+    [:div {:id "canvas-container" :style {:position "relative" :width "fit-content"}}
+     [:f> cue-overlay {:state @state}]
+     [:f> pdf-canvas {:url "/test.pdf" :state @state}] ;; TODO: only view the ux/nav state of
+     ]
     [:div "cues"
      [:ul (for [cue (sorted-cues (:cues @state))]
-           ^{:key (:cue-number cue)} [cue-button-li cue])]]]])
+            ^{:key (.indexOf (:cues @state) cue)} [cue-button-li cue])]]]])
 
 (defn ^:dev/before-load stop []
   (js/console.log "stop"))
