@@ -339,7 +339,7 @@
                                           :width (first (:doc-dims @state))
                                           :height (second (:doc-dims @state))}}
      [:f> cue-overlay {:state @state}]
-     [:f> pdf-canvas {:url "/test.pdf" :state @state}] ;; TODO: only view the ux/nav state of
+     [:f> pdf-canvas {:url "test.pdf" :state @state}] ;; TODO: only view the ux/nav state of
      ]
     [:div "cues"
      [:ul (for [cue (sorted-cues (:cues @state))]
