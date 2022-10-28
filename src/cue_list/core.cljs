@@ -2,11 +2,11 @@
   (:require
    [goog.object :as gobj]
    [goog.string :as gstring]
+    goog.string.format
    ["react" :as react]
    [reagent.core :as reagent]
    [reagent.dom :as rdom]
    )
-
 )
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))

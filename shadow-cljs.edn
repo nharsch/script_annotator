@@ -10,8 +10,8 @@
 
  :dev-http {8000 "resources/public"}
 
- :builds
- {:app {:target :browser
-        :output-dir "resources/public/js"
-        :asset-path "/js"
-        :modules {:main {:init-fn cue-list.core/init}}}}}
+ :builds {:app {:target :browser
+                :output-dir "resources/public/js"
+                :asset-path "/js"
+                :compiler-options {:infer-externs :auto}
+                :modules {:main {:init-fn cue-list.core/init}}}}}
