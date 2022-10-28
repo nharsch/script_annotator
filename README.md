@@ -14,3 +14,6 @@ A tool for adding cue events to script PDFs.
 - collaborative sharing
 
 ![preview](https://raw.githubusercontent.com/nharsch/script_annotator/master/script%20cue%20annotator%20preview.png)
+
+
+[Live](https://nigelharsch.com/script_annotator/resources/public/index.html)
