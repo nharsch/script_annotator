@@ -38,16 +38,43 @@
 ;;;; FULCRO ;;;;
 (defonce APP (app/fulcro-app))
 
-(defsc Sample [this props]
+(defsc Nav-Bar [this {:keys [page zoom rotate] :as props}]
   {}
-  (dom/div (str props)))
+  (dom/div (dom/div "page: " page)
+           (dom/div "zoom: " zoom)
+           (dom/div "rotate: " rotate)))
+
+(def ui-navbar (comp/factory Nav-Bar {:keyfn :ui/page}))
+
+(defsc Cue [this {:cue/keys [number position page description action]}]
+  {}
+  (dom/div "number: " number))
+
+(def ui-cue (comp/factory Cue {:keyfn :cue/number}))
+
+(defsc Sample [this {:keys [ui cues]}]
+  {}
+  (dom/div
+   (ui-navbar ui)
+   (dom/ul (map ui-cue cues))))
 
 (comment
-  (reset! (::app/state-atom APP) {:page 16
-                                  :zoom 1
-                                  :selected-cue-idx nil
-                                  :rotate 0
-                                  :cues []})
+  (reset! (::app/state-atom APP) {:ui {:page 16
+                                       :zoom 1
+                                       :selected-cue-idx nil
+                                       :rotate 0
+                                       }
+                                  :cues [{:cue/number 1
+                                          :cue/position [0 0]
+                                          :cue/page 16
+                                          :cue/description "test cue"
+                                          :cue/action "test action"}
+                                         {:cue/number 2
+                                          :cue/position [1 1]
+                                          :cue/page 16
+                                          :cue/description "test cue"
+                                          :cue/action "test action"}
+                                         ]})
   (app/mount! APP Sample "fulcro-app")
   (app/schedule-render! APP)
   )
