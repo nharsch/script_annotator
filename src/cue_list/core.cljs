@@ -8,6 +8,7 @@
    [reagent.dom :as rdom]
    [com.fulcrologic.fulcro.application :as app]
    [com.fulcrologic.fulcro.dom :as dom]
+   [com.fulcrologic.fulcro.algorithms.merge :as merge]
    [com.fulcrologic.fulcro.components :as comp :refer [defsc]]
    )
 )
@@ -46,9 +47,12 @@
 
 (def ui-navbar (comp/factory Nav-Bar {:keyfn :ui/page}))
 
-(defsc Cue [this {:cue/keys [number position page description action]}]
-  {}
-  (dom/div "number: " number))
+(defsc Cue [this props]
+  {:query [:cue/number :cue/description :cue/action]
+   :ident :cue/number}
+  (dom/div (gstring/format "number: %s action: %s"
+                           (:cue/number props)
+                           (:cue/number action))))
 
 (def ui-cue (comp/factory Cue {:keyfn :cue/number}))
 
@@ -62,21 +66,29 @@
   (reset! (::app/state-atom APP) {:ui {:page 16
                                        :zoom 1
                                        :selected-cue-idx nil
-                                       :rotate 0
-                                       }
+                                       :rotate 0}
                                   :cues [{:cue/number 1
                                           :cue/position [0 0]
                                           :cue/page 16
                                           :cue/description "test cue"
                                           :cue/action "test action"}
-                                         {:cue/number 2
-                                          :cue/position [1 1]
-                                          :cue/page 16
-                                          :cue/description "test cue"
-                                          :cue/action "test action"}
                                          ]})
+  (:cues (deref (::app/state-atom APP)))
   (app/mount! APP Sample "fulcro-app")
   (app/schedule-render! APP)
+  ;; can merge in components
+  (reset! (::app/state-atom APP) {})
+  (merge/merge-component! APP Cue {:cue/number 2
+                                   :cue/position [10 10]
+                                   :cue/page 16
+                                   :cue/description "test cue"
+                                   :cue/action "test action"})
+  (merge/merge-component! APP Cue {:cue/number 3
+                                   :cue/position [10 10]
+                                   :cue/page 16
+                                   :cue/description "test cue"
+                                   :cue/action "test action"})
+  (app/current-state APP)
   )
 
 
