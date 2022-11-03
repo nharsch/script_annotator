@@ -6,10 +6,15 @@
    ["react" :as react]
    [reagent.core :as reagent]
    [reagent.dom :as rdom]
+   [com.fulcrologic.fulcro.application :as app]
+   [com.fulcrologic.fulcro.dom :as dom]
+   [com.fulcrologic.fulcro.components :as comp :refer [defsc]]
    )
 )
 
 (def ^js pdfjs (gobj/get js/window "pdfjs-dist/build/pdf"))
+
+
 
 
 ;; TODO: create spec/schema for cue map
@@ -30,7 +35,27 @@
                               :rotate 0
                               :cues []}))
 
+;;;; FULCRO ;;;;
+(defonce APP (app/fulcro-app))
+
+(defsc Sample [this props]
+  {}
+  (dom/div (str props)))
+
 (comment
+  (reset! (::app/state-atom APP) {:page 16
+                                  :zoom 1
+                                  :selected-cue-idx nil
+                                  :rotate 0
+                                  :cues []})
+  (app/mount! APP Sample "fulcro-app")
+  (app/schedule-render! APP)
+  )
+
+
+
+(comment
+
   (reset! state {:page 16
           :zoom 1
           :selected-cue-idx nil
@@ -317,7 +342,7 @@
       ]]))
 
 ;; APP
-(defn app []
+(defn ui []
   [:div [:h1 "Script Cue Annotator"]
    [:div {:id "nav" :style {:display "flex" :align-items "flex-start" :column-gap "20px"}}
     [:div {:style {:display "flex" :align-items "flex-start" :column-gap "5px"}}
@@ -349,7 +374,7 @@
   (js/console.log "stop"))
 
 (defn ^:dev/after-load start []
-  (rdom/render [app] (js/document.querySelector "#app"))
+  (rdom/render [ui] (js/document.querySelector "#app"))
   )
 
 
