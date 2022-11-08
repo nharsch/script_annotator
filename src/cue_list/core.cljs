@@ -47,20 +47,30 @@
 
 (def ui-navbar (comp/factory Nav-Bar {:keyfn :ui/page}))
 
-(defsc Cue [this props]
+(defsc Cue [this {:cue/keys [number description action]}]
   {:query [:cue/number :cue/description :cue/action]
    :ident :cue/number}
-  (dom/div (gstring/format "number: %s action: %s"
-                           (:cue/number props)
-                           (:cue/number action))))
+  ;; (dom/div (str props))
+  (dom/div (gstring/format "number: %s action: %s" number action))
+  )
 
 (def ui-cue (comp/factory Cue {:keyfn :cue/number}))
 
-(defsc Sample [this {:keys [ui cues]}]
+(defsc CueList [this {:cue/keys [list]}]
+  (dom/div
+   (dom/ul
+    (map ui-cue list))))
+
+(def ui-cue-list (comp/factory CueList))
+
+(defsc Root [this {:keys [ui cues]}]
   {}
   (dom/div
-   (ui-navbar ui)
-   (dom/ul (map ui-cue cues))))
+   ;; (ui-navbar ui)
+   (dom/div "root")
+   (dom/div (str cues))
+   (ui-cue-list cues)
+   ))
 
 (comment
   (reset! (::app/state-atom APP) {:ui {:page 16
@@ -74,20 +84,23 @@
                                           :cue/action "test action"}
                                          ]})
   (:cues (deref (::app/state-atom APP)))
-  (app/mount! APP Sample "fulcro-app")
+  (app/mount! APP Root "fulcro-app")
   (app/schedule-render! APP)
   ;; can merge in components
-  (reset! (::app/state-atom APP) {})
+  (reset! (::app/state-atom APP) {:cues {:cue/list []} :ui {}})
   (merge/merge-component! APP Cue {:cue/number 2
                                    :cue/position [10 10]
                                    :cue/page 16
                                    :cue/description "test cue"
-                                   :cue/action "test action"})
+                                   :cue/action "test action"}
+                          :append [:cues :cue/list]
+                          )
   (merge/merge-component! APP Cue {:cue/number 3
                                    :cue/position [10 10]
                                    :cue/page 16
                                    :cue/description "test cue"
-                                   :cue/action "test action"})
+                                   :cue/action "test action"}
+                          :append [:cues :cue/list])
   (app/current-state APP)
   )
 
